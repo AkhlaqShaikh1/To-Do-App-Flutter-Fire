@@ -1,13 +1,9 @@
-class ToDo {
-  final bool isCompleted;
-  final String title;
-  final String description;
+class Todo {
+  String description;
+  String title;
+  bool isCompleted;
 
-  ToDo({
-    required this.isCompleted,
-    required this.title,
-    required this.description,
-  });
+  Todo({required this.description, required this.title, required this.isCompleted});
 }
 
-List<ToDo> todo = [];
+// List<ToDo> todo = [];

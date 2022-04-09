@@ -1,127 +1,248 @@
-import 'package:firebase_to_do_app/models/to_do_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:firebase_core/firebase_core.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+class Home extends StatefulWidget {
+  static String id = "/home";
+  const Home({Key? key}) : super(key: key);
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  _HomeState createState() => _HomeState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final TextEditingController titleController = TextEditingController();
-  final TextEditingController descriptionController = TextEditingController();
-  final GlobalKey<FormState> _key = GlobalKey<FormState>();
+class _HomeState extends State<Home> {
+  TextEditingController titleController = TextEditingController();
+  TextEditingController descriptController = TextEditingController();
 
-  String? check(String? text) {
-    if (text!.isEmpty) {
-      return "Field can't be empty";
+  addTodo() async {
+    if (titleController.text != "" && descriptController.text != "") {
+      var time = DateTime.now();
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection("myTasks")
+          .doc(time.toString())
+          .set({
+        'title': titleController.text,
+        'description': descriptController.text,
+        'time': time.toString(),
+        'timestamp': time,
+      });
+      titleController.clear();
+      descriptController.clear();
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("Task Added "),
+        duration: Duration(seconds: 3),
+      ));
+    } else {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("No title or description added"),
+        ),
+      );
     }
-    return null;
+  }
+
+  String uid = '';
+  @override
+  void initState() {
+    super.initState();
+    getuid();
+  }
+
+  getuid() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    // uid = user!.uid;
+    setState(() {
+      uid = user!.uid;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        centerTitle: true,
-        elevation: 0,
-        title: const Text("TO-DO's"),
-      ),
-      body: SingleChildScrollView(
-        child: Form(
-          key: _key,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16.0),
-                margin: const EdgeInsets.all(8.0),
-                child: TextFormField(
-                  validator: check,
-                  controller: titleController,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: "Title",
+    return SafeArea(
+      child: Scaffold(
+        // backgroundColor: background,
+        body: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .collection('myTasks')
+              .snapshots(),
+          builder:
+              (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Text("Loading");
+            }
+            if (!snapshot.hasData) {
+              return const ScaffoldMessenger(child: Text("Cancelled"));
+            } else {
+              final docs = snapshot.data!.docs;
+              return SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "My Tasks",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 25),
+                      ),
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          var time =
+                              (docs[index]['timestamp'] as Timestamp).toDate();
+                          return ListView(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.only(top: 8),
+                                margin: const EdgeInsets.only(top: 14),
+                                height: 110,
+                                decoration: BoxDecoration(
+                                  color: Colors.blueGrey.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: ListTile(
+                                  title: Text(
+                                    docs[index]['title'],
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    docs[index]['description'] +
+                                        "\n" +
+                                        DateFormat.yMd().add_jm().format(time),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  trailing: IconButton(
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () async {
+                                        await FirebaseFirestore.instance
+                                            .collection('users')
+                                            .doc(uid)
+                                            .collection('myTasks')
+                                            .doc(docs[index]['time'])
+                                            .delete();
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(" Task Deleted! "),
+                                          ),
+                                        );
+                                      }),
+                                ),
+                              )
+                            ],
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(16.0),
-                margin: const EdgeInsets.all(8.0),
-                // width: ,
-                child: TextFormField(
-                  controller: descriptionController,
-                  validator: check,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: "Description",
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (_key.currentState!.validate()) {
-                    ToDo newTodo = ToDo(
-                        isCompleted: false,
-                        title: titleController.text,
-                        description: descriptionController.text);
-                    todo.add(newTodo);
-                    FocusManager.instance.primaryFocus?.unfocus();
-                    setState(() {});
-                  }
-                },
-                child: const Text("Add TO-DO"),
-              ),
-              const SizedBox(height: 15),
-              toDoTile(),
-            ],
+              );
+            }
+          },
+        ),
+        floatingActionButton: FloatingActionButton(
+          splashColor: Colors.white,
+          onPressed: () {
+            setState(() {
+              addTodosBox();
+            });
+          },
+          child: const Icon(
+            Icons.add,
           ),
         ),
       ),
     );
   }
 
-  Widget toDoTile() {
-    return SingleChildScrollView(
-      child: ListView.builder(
-        // scrollDirection: Axis.vertical,
-        physics: const NeverScrollableScrollPhysics(),
-        shrinkWrap:
-            true, // use this to remove errors of listview inside of column
-        itemCount: todo.length,
-        itemBuilder: (context, index) {
-          return Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.all(Radius.circular(15)),
-              boxShadow: [
-                BoxShadow(
-                  offset: Offset(1, 1),
-                  spreadRadius: 1,
-                  blurRadius: 15,
-                  color: Colors.black26,
-                ),
-                BoxShadow(
-                  offset: Offset(2, 10),
-                  spreadRadius: 1,
-                  blurRadius: 15,
-                  color: Colors.black26,
-                ),
-              ],
+  addTodosBox() {
+    return showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-            width: 200,
-            height: 150,
-            margin: const EdgeInsets.all(8.0),
-            padding: const EdgeInsets.all(5.0),
-            child: ListTile(
-              title: Text(todo[index].title),
-              subtitle: Text(todo[index].description),
+            title: const Text("Add Todo"),
+            content: SizedBox(
+              height: 200,
+              width: 400,
+              child: Column(
+                children: [
+                  TextField(
+                    controller: titleController,
+                    decoration: const InputDecoration(
+                      hintText: "Title",
+                    ),
+                  ),
+                  TextField(
+                    controller: descriptController,
+                    decoration: const InputDecoration(
+                      hintText: "Description",
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      ElevatedButton(
+                        style: ButtonStyle(
+                          // maximumSize: MaterialStateProperty.all(Size(30, 30)),
+                          backgroundColor:
+                              MaterialStateProperty.all(Colors.lightBlue),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        child: const Text("Cancel"),
+                      ),
+                      ElevatedButton(
+                        style: ButtonStyle(
+                          // maximumSize: MaterialStateProperty.all(Size(30, 30)),
+                          backgroundColor:
+                              MaterialStateProperty.all(Colors.lightBlue),
+                        ),
+                        onPressed: addTodo,
+                        child: const Text("Add"),
+                      ),
+                    ],
+                  )
+                ],
+              ),
             ),
           );
-        },
-      ),
+        });
+  }
+
+  description(text) {
+    return Text(
+      text,
+      style: const TextStyle(fontWeight: FontWeight.bold),
     );
   }
 }
